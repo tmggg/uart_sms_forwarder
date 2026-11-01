@@ -186,7 +186,7 @@ func (m *Manager) HandleMQTT(topic string, payload []byte) error {
 	if err != nil {
 		return errPacket
 	}
-	body, err := decryptPacketWithAAD(root, p, session.AADMode)
+	body, err := decryptSessionPacket(root, p, session)
 	if err != nil {
 		return errPacket
 	}
@@ -213,6 +213,14 @@ func (m *Manager) HandleMQTT(topic string, payload []byte) error {
 }
 
 func (m *Manager) registerMQTT(p Envelope) error {
+	protocol := protocolForVersion(p.V)
+	if !supportedProtocol(protocol) {
+		return errPacket
+	}
+	var credential Credential
+	if err := m.DB.First(&credential, "device_id = ? AND revoked = ?", p.DeviceID, false).Error; err != nil || normalizeProtocol(credential.Protocol) != protocol {
+		return errPacket
+	}
 	if p.KeyID != m.Config.MQTT.KeyID {
 		return errPacket
 	}
@@ -221,10 +229,15 @@ func (m *Manager) registerMQTT(p Envelope) error {
 		return errPacket
 	}
 	aadMode := ""
-	body, err := decryptPacket(root, p)
-	if err != nil {
-		aadMode = luatFixedAADMode
-		body, err = decryptPacketWithAAD(root, p, aadMode)
+	var body json.RawMessage
+	if protocol == protocolCBC {
+		body, err = decryptCBC(root, p, "up")
+	} else {
+		body, err = decryptPacket(root, p)
+		if err != nil {
+			aadMode = luatFixedAADMode
+			body, err = decryptPacketWithAAD(root, p, aadMode)
+		}
 	}
 	if err != nil {
 		return errPacket
@@ -237,10 +250,6 @@ func (m *Manager) registerMQTT(p Envelope) error {
 	if json.Unmarshal(body, &request) != nil || request.KeyID != p.KeyID || stringValue(request.Features["device_id"]) != p.DeviceID {
 		return errPacket
 	}
-	var credential Credential
-	if err := m.DB.First(&credential, "device_id = ? AND revoked = ?", p.DeviceID, false).Error; err != nil {
-		return errPacket
-	}
 	hash := sha256.Sum256([]byte(request.Token))
 	if subtle.ConstantTimeCompare([]byte(credential.TokenHash), []byte(hex.EncodeToString(hash[:]))) != 1 {
 		return errPacket
@@ -251,12 +260,13 @@ func (m *Manager) registerMQTT(p Envelope) error {
 	if exists && live.mode == "serial" {
 		return errors.New("device has active serial connection")
 	}
+	request.Features["crypto_protocol"] = protocol
 	features, _ := json.Marshal(request.Features)
 	err = m.DB.Transaction(func(tx *gorm.DB) error {
 		var existing Session
 		err := tx.First(&existing, "id = ?", p.SID).Error
 		if err == nil {
-			if existing.DeviceID != p.DeviceID || existing.Retired || existing.UpSeq != p.Seq || existing.WrappedKey != p.WrappedKey || existing.AADMode != aadMode {
+			if existing.DeviceID != p.DeviceID || existing.Retired || existing.UpSeq != p.Seq || existing.WrappedKey != p.WrappedKey || existing.AADMode != aadMode || normalizeProtocol(existing.Protocol) != protocol {
 				return errPacket
 			}
 			var d Device
@@ -271,7 +281,7 @@ func (m *Manager) registerMQTT(p Envelope) error {
 		if err := tx.Model(&Session{}).Where("device_id = ?", p.DeviceID).Update("retired", true).Error; err != nil {
 			return err
 		}
-		s := Session{ID: p.SID, DeviceID: p.DeviceID, WrappedKey: p.WrappedKey, KeyID: p.KeyID, UpSeq: p.Seq, AADMode: aadMode}
+		s := Session{Protocol: protocol, ID: p.SID, DeviceID: p.DeviceID, WrappedKey: p.WrappedKey, KeyID: p.KeyID, UpSeq: p.Seq, AADMode: aadMode}
 		if err := tx.Create(&s).Error; err != nil {
 			return err
 		}

@@ -18,6 +18,7 @@ type Device struct {
 }
 
 type Credential struct {
+	Protocol  string `json:"cryptoProtocol"`
 	DeviceID  string `gorm:"primaryKey;size:64" json:"deviceId"`
 	TokenHash string `json:"-"`
 	Revoked   bool   `json:"revoked"`
@@ -25,6 +26,7 @@ type Credential struct {
 }
 
 type Session struct {
+	Protocol   string
 	AADMode    string `gorm:"column:aad_mode"`
 	ID         string `gorm:"primaryKey;size:32"`
 	DeviceID   string `gorm:"index"`

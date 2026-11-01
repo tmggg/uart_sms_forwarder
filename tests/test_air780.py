@@ -156,6 +156,38 @@ class Harness:
 
 
 class Air780Tests(unittest.TestCase):
+    def test_cpu_temperature_and_adc_failure(self):
+        h = Harness()
+        h.lua.execute(b'closed=0; adc={CH_CPU=1,open=function() return true end,get=function() return 32500 end,close=function() closed=closed+1 end}')
+        h.run_main()
+        self.assertEqual(h.g.get_mobile_info()[b'temperature_mc'], 32500)
+        self.assertEqual(h.g.closed, 1)
+        h.lua.execute(b'adc.get=function() return -1 end')
+        self.assertIs(h.g.get_mobile_info()[b'temperature_mc'], False)
+        h.lua.execute(b'adc.get=function() error("read failed") end')
+        self.assertIs(h.g.get_mobile_info()[b'temperature_mc'], False)
+        self.assertEqual(h.g.closed, 3)
+        h.lua.execute(b'adc=nil')
+        self.assertIs(h.g.get_mobile_info()[b'temperature_mc'], False)
+
+    def test_vbat_voltage_and_adc_failure(self):
+        h = Harness()
+        h.lua.execute(b'closed=0; adc={CH_VBAT=2,open=function(ch) assert(ch==2); return true end,get=function(ch) assert(ch==2); return 3850 end,close=function(ch) assert(ch==2); closed=closed+1 end}')
+        h.run_main()
+        self.assertEqual(h.g.get_mobile_info()[b'battery_mv'], 3850)
+        self.assertEqual(h.g.closed, 1)
+        for value in [b'-1', b'0', b'10001', b'nil', b'"3850"']:
+            h.lua.execute(b'adc.get=function() return ' + value + b' end')
+            self.assertEqual(h.g.get_mobile_info()[b'battery_mv'], 0)
+        h.lua.execute(b'adc.get=function() error("failed") end')
+        self.assertEqual(h.g.get_mobile_info()[b'battery_mv'], 0)
+        self.assertEqual(h.g.closed, 7)
+        h.lua.execute(b'adc.open=function() return false end')
+        self.assertEqual(h.g.get_mobile_info()[b'battery_mv'], 0)
+        self.assertEqual(h.g.closed, 7)
+        h.lua.execute(b'adc=nil')
+        self.assertEqual(h.g.get_mobile_info()[b'battery_mv'], 0)
+
     def test_all_files_parse(self):
         h = Harness()
         for p in ROOT.glob('*.lua'):

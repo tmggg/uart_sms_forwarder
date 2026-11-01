@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {Copy, Download, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck, Unplug} from 'lucide-react';
 import {toast} from 'sonner';
-import {downloadText, enrollDevice, getDevices, getPublicKey, revokeDevice, type Enrollment} from '@/api/devices';
+import {downloadText, enrollDevice, getDevices, getPublicKey, revokeDevice, type Enrollment, type DeviceType} from '@/api/devices';
 import {PageHeader} from '@/components/PageHeader';
 import QueryError from '@/components/QueryError';
 import {Button} from '@/components/ui/button';
@@ -14,6 +14,7 @@ export default function DeviceEnrollment() {
     const client = useQueryClient();
     const alive = useRef(true);
     const [deviceId, setDeviceId] = useState('');
+    const [deviceType, setDeviceType] = useState<DeviceType>('air780');
     const [tokenVisible, setTokenVisible] = useState(false);
     const tokenInput = useRef<HTMLInputElement>(null);
     const [replace, setReplace] = useState(false);
@@ -31,7 +32,7 @@ export default function DeviceEnrollment() {
         if (!valid || busy || !replace) return;
         setBusy(true); setIssued(null); setTokenVisible(false);
         try {
-            const result = await enrollDevice(deviceId.trim());
+            const result = await enrollDevice(deviceId.trim(), deviceType);
             void client.invalidateQueries({queryKey: ['devices']});
             if (alive.current) {setIssued(result); toast.success('设备注册配置已生成');}
         } catch (error) {if (alive.current) toast.error(error instanceof Error ? error.message : '生成失败');}
@@ -74,6 +75,7 @@ export default function DeviceEnrollment() {
                 <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900"><KeyRound className="size-5 text-blue-700"/>MQTT 注册配置</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">设备 ID 与脚本保持一致；脚本未指定 ID 时使用模组 IMEI。账号密码需另外在 EMQX 中配置。</p>
                 <form className="mt-5 space-y-4" onSubmit={(e) => {e.preventDefault(); void issue();}}>
+                    <div><label htmlFor="enroll-device-type" className="mb-2 block text-sm font-medium text-slate-700">设备类型</label><select id="enroll-device-type" value={deviceType} disabled={busy} onChange={(e) => {setDeviceType(e.target.value as DeviceType); setIssued(null); setReplace(false); setTokenVisible(false);}} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"><option value="air780">Air780 · AES-256-GCM</option><option value="air724ug">Air724UG V4035 · AES-256-CBC + HMAC-SHA256</option></select><p className="mt-2 text-xs leading-5 text-slate-500">更换协议需重新生成配置并更新设备脚本。Air724UG 串口版 1.0.1 不能使用 MQTT 配置，需配套 v2 MQTT 脚本。</p></div>
                     <div><label htmlFor="enroll-device-id" className="mb-2 block text-sm font-medium text-slate-700">设备 ID</label><Input id="enroll-device-id" value={deviceId} onChange={(e) => {setDeviceId(e.target.value); setReplace(false);}} placeholder="例如模组 IMEI" maxLength={64} disabled={busy}/><p className="mt-2 text-xs text-slate-400">支持 1–64 个字母、数字、下划线或横线。</p></div>
                     {existing && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">这台设备已登记。重新生成会轮换注册凭据，并使其现有 MQTT 会话失效。</p>}
                     <label className="flex items-start gap-2 text-xs leading-5 text-slate-600"><input type="checkbox" checked={replace} disabled={busy} onChange={(e) => setReplace(e.target.checked)} className="mt-1 accent-blue-700"/>我确认设备 ID 正确；若此前已生成配置，将使用新凭据更新设备脚本。</label>
@@ -91,7 +93,7 @@ export default function DeviceEnrollment() {
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2"><Button type="button" variant="outline" size="sm" onClick={() => void copyToken()}><Copy className="size-3.5"/>复制注册凭据</Button><span className="text-xs text-slate-500">点击眼睛图标查看完整凭据。</span></div>
                     </div>
-                    <dl className="space-y-2 text-xs text-slate-600"><div>公钥版本：<span className="font-mono">{issued.keyId}</span></div><div className="break-all">主题前缀：<span className="font-mono">{issued.topicPrefix}</span></div></dl>
+                    <dl className="space-y-2 text-xs text-slate-600"><div>设备类型：{issued.deviceType === 'air724ug' ? 'Air724UG V4035' : 'Air780'}</div><div>加密协议：<span className="font-mono">{issued.cryptoProtocol || 'sms-air780-v1'}</span></div><div>公钥文件：<span className="font-mono">{issued.publicKeyFile || '/luadb/server_public.pem'}</span></div><div>公钥版本：<span className="font-mono">{issued.keyId}</span></div><div className="break-all">主题前缀：<span className="font-mono">{issued.topicPrefix}</span></div></dl>
                     <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => downloadText('server_public.pem', issued.publicKey)}><Download className="size-4"/>下载公钥</Button><Button onClick={() => downloadText(`device-${issued.deviceId}-enrollment.json`, JSON.stringify(issued, null, 2))}><Download className="size-4"/>保存注册配置</Button></div>
                     <p className="text-xs leading-5 text-slate-500">配置文件包含设备注册凭据，请妥善保管。将相应字段填入 device_config.lua，再将公钥与全部 Lua 文件一起烧录。</p>
                 </div>}

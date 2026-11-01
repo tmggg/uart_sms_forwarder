@@ -1,5 +1,5 @@
 PROJECT = "uart_sms_forwarder"
-VERSION = "2.1.1"
+VERSION = "2.1.3"
 sys = require "sys"
 require "sysplus"
 local config = require "device_config"
@@ -65,6 +65,29 @@ local function uptime()
     return high * 1000000 + low
 end
 
+-- CPU temperature in millidegrees Celsius; false clears a failed reading.
+local function temperature_mc()
+    if not adc or not adc.CH_CPU or not adc.open or not adc.get or not adc.close then return false end
+    local opened, result = pcall(adc.open, adc.CH_CPU)
+    if not opened or result == false then return false end
+    local ok, value = pcall(adc.get, adc.CH_CPU)
+    pcall(adc.close, adc.CH_CPU)
+    if not ok or type(value) ~= "number" or value ~= value
+        or value < -50000 or value > 150000 or value == -1 then return false end
+    return math.floor(value)
+end
+
+-- VBAT supply voltage in millivolts; zero clears an unavailable reading.
+local function battery_mv()
+    if not adc or not adc.CH_VBAT or not adc.open or not adc.get or not adc.close then return 0 end
+    local opened, result = pcall(adc.open, adc.CH_VBAT)
+    if not opened or result == false then return 0 end
+    local ok, value = pcall(adc.get, adc.CH_VBAT)
+    pcall(adc.close, adc.CH_VBAT)
+    if not ok or type(value) ~= "number" or value ~= value or value <= 0 or value > 10000 then return 0 end
+    return math.floor(value)
+end
+
 function get_mobile_info()
     local stat, iccid = mobile.status(), mobile.iccid()
     local csq = mobile.csq() or 0
@@ -77,7 +100,7 @@ function get_mobile_info()
         signal_level = level, signal_desc = level == 0 and "无信号" or (level >= 20 and "强" or (level >= 10 and "中" or "弱")),
         is_registered = stat == 1 or stat == 5 or stat == 6 or stat == 7,
         is_roaming = stat == 5 or stat == 7, net_status = stat,
-        uptime = uptime(), flymode = mobile.flymode(),
+        uptime = uptime(), flymode = mobile.flymode(), temperature_mc = temperature_mc(), battery_mv = battery_mv(),
     }
 end
 

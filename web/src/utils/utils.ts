@@ -1,3 +1,13 @@
+export const formatSignalQuality = (rsrp: number | undefined | null, connected: boolean): string => {
+    if (!connected || typeof rsrp !== 'number' || !Number.isFinite(rsrp) || rsrp < -140 || rsrp > -44) return '—';
+    const quality = rsrp >= -80 ? '优秀' : rsrp >= -90 ? '良好' : rsrp >= -100 ? '一般' : rsrp >= -110 ? '较弱' : '很弱';
+    return `${quality} · ${rsrp} dBm`;
+};
+
+export const formatVoltage = (mv: number | undefined | null, connected: boolean): string =>
+    connected && typeof mv === 'number' && Number.isFinite(mv) && Number.isInteger(mv) && mv > 0 && mv <= 10000
+        ? `${(mv / 1000).toFixed(3)} V` : '—';
+
 export const formatUptime = (seconds: number | undefined | null): string => {
     if (seconds === undefined || seconds === null) return '-';
     if (seconds <= 0) return '0 秒';
@@ -21,3 +31,7 @@ export const formatUptime = (seconds: number | undefined | null): string => {
 
     return parts.length > 0 ? parts.join(' ') : '不到 1 分钟';
 };
+
+export const formatTemperature = (mc: number | undefined | null, connected: boolean): string =>
+    connected && typeof mc === 'number' && Number.isFinite(mc) && Number.isInteger(mc) && mc >= -50000 && mc <= 150000
+        ? `${(mc / 1000).toFixed(1)} °C` : '—';

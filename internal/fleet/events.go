@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -36,7 +37,7 @@ func mergeStatus(old string, event map[string]any) string {
 			mobile[k] = v
 		}
 	}
-	for _, k := range []string{"rssi", "signal_level", "signal_desc", "sim_ready", "sms_ready", "flymode"} {
+	for _, k := range []string{"rssi", "signal_level", "signal_desc", "sim_ready", "sms_ready", "flymode", "battery_mv", "temperature_mc"} {
 		if v, ok := event[k]; ok {
 			mobile[k] = v
 		}
@@ -47,6 +48,18 @@ func mergeStatus(old string, event map[string]any) string {
 	for _, k := range []string{"type", "version", "timestamp", "mem_kb", "memory_usage", "buffer_size", "locating"} {
 		if v, ok := event[k]; ok {
 			status[k] = v
+		}
+	}
+	if value, exists := mobile["battery_mv"]; exists {
+		mv, ok := value.(float64)
+		if !ok || math.IsNaN(mv) || math.IsInf(mv, 0) || mv <= 0 || mv > 10000 || math.Trunc(mv) != mv {
+			mobile["battery_mv"] = nil
+		}
+	}
+	if value, exists := mobile["temperature_mc"]; exists {
+		mc, ok := value.(float64)
+		if !ok || math.IsNaN(mc) || math.IsInf(mc, 0) || mc < -50000 || mc > 150000 || math.Trunc(mc) != mc {
+			mobile["temperature_mc"] = nil
 		}
 	}
 	status["mobile"] = mobile
@@ -90,6 +103,13 @@ func (m *Manager) eventTx(tx *gorm.DB, id, messageID string, data json.RawMessag
 	case "heartbeat", "status_response", "system_ready":
 		updates["status"] = mergeStatus(d.Status, e)
 		if features, ok := e["features"].(map[string]any); ok {
+			// Protocol is a server-authenticated session property, not a device claim.
+			var previous map[string]any
+			_ = json.Unmarshal([]byte(d.Features), &previous)
+			delete(features, "crypto_protocol")
+			if protocol := stringValue(previous["crypto_protocol"]); supportedProtocol(protocol) {
+				features["crypto_protocol"] = protocol
+			}
 			b, _ := json.Marshal(features)
 			updates["features"] = string(b)
 		}

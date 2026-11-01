@@ -293,7 +293,7 @@ export default function NotificationChannels() {
         onError: (error: unknown) => {
             if (!isActive()) return;
             console.error('保存失败:', error);
-            toast.error('保存失败');
+            toast.error(error instanceof Error ? error.message : '保存失败');
         },
     });
 
@@ -303,7 +303,7 @@ export default function NotificationChannels() {
         onError: (error: unknown) => {
             if (!isActive()) return;
             console.error('测试失败:', error);
-            toast.error('测试失败，请检查配置');
+            toast.error(error instanceof Error ? error.message : '测试失败，请检查配置');
         },
     });
 

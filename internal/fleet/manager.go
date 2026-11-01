@@ -96,6 +96,14 @@ func (m *Manager) Start(ctx context.Context) error {
 func (m *Manager) PublicKey() ([]byte, error) { return publicPEM(m.private) }
 
 func (m *Manager) Provision(ctx context.Context, id string) (string, error) {
+	return m.ProvisionProtocol(ctx, id, protocolGCM)
+}
+
+func (m *Manager) ProvisionProtocol(ctx context.Context, id, protocol string) (string, error) {
+	protocol = normalizeProtocol(protocol)
+	if !supportedProtocol(protocol) {
+		return "", errors.New("unsupported encryption protocol")
+	}
 	m.mqttMu.Lock()
 	defer m.mqttMu.Unlock()
 	if !validID.MatchString(id) {
@@ -108,8 +116,8 @@ func (m *Manager) Provision(ctx context.Context, id string) (string, error) {
 	token := hex.EncodeToString(b)
 	hash := sha256.Sum256([]byte(token))
 	err := m.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		c := Credential{DeviceID: id, TokenHash: hex.EncodeToString(hash[:])}
-		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "device_id"}}, DoUpdates: clause.AssignmentColumns([]string{"token_hash", "revoked"})}).Create(&c).Error; err != nil {
+		c := Credential{Protocol: protocol, DeviceID: id, TokenHash: hex.EncodeToString(hash[:])}
+		if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "device_id"}}, DoUpdates: clause.AssignmentColumns([]string{"token_hash", "revoked", "protocol"})}).Create(&c).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&Session{}).Where("device_id = ?", id).Update("retired", true).Error; err != nil {

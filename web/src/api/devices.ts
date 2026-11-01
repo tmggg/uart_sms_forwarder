@@ -17,6 +17,7 @@ export interface DeviceRecord {
         name?: string;
         model?: string;
         firmware?: string;
+        crypto_protocol?: string;
         version?: string;
         mobile?: Partial<MobileInfo>;
     } | null;
@@ -28,7 +29,13 @@ export interface PublicKeyInfo {
     publicKey: string;
 }
 
+export type DeviceType = 'air780' | 'air724ug';
 export interface Enrollment extends PublicKeyInfo {
+    deviceType?: DeviceType;
+    cryptoProtocol?: 'sms-air780-v1' | 'sms-air724-v2';
+    protocolVersion?: number;
+    rsaBits?: number;
+    publicKeyFile?: string;
     deviceId: string;
     registrationToken: string;
     topicPrefix: string;
@@ -55,7 +62,7 @@ export const getDevices = (signal?: AbortSignal) => apiClient.get<DeviceRecord[]
 export const getDevice = (id: string, signal?: AbortSignal) => apiClient.get<DeviceRecord>(devicePath(id), {signal});
 export const renameDevice = (id: string, name: string) => apiClient.put<void>(devicePath(id), {name});
 export const getPublicKey = (signal?: AbortSignal) => apiClient.get<PublicKeyInfo>('/devices/server-public-key', {signal});
-export const enrollDevice = (deviceId: string) => apiClient.post<Enrollment>('/devices/enroll', {deviceId});
+export const enrollDevice = (deviceId: string, deviceType: DeviceType = 'air780') => apiClient.post<Enrollment>('/devices/enroll', {deviceId, deviceType});
 export const revokeDevice = (deviceId: string) => {
     devicePath(deviceId);
     return apiClient.post<void>(`/device-enrollments/${encodeURIComponent(deviceId)}/revoke`);

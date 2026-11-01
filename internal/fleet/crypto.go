@@ -199,6 +199,12 @@ func decryptPacketWithAAD(root []byte, p Envelope, mode string) (json.RawMessage
 }
 
 func encryptPacket(root []byte, s Session, kind string, body any) ([]byte, error) {
+	if normalizeProtocol(s.Protocol) == protocolCBC {
+		return encryptCBC(root, s, kind, body)
+	}
+	if normalizeProtocol(s.Protocol) != protocolGCM {
+		return nil, errPacket
+	}
 	if s.DownSeq < 1 || s.DownSeq > 2147483647 {
 		return nil, fmt.Errorf("session sequence exhausted")
 	}

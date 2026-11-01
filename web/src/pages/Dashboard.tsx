@@ -1,4 +1,5 @@
 import {describeOperator} from '@/utils/operator';
+import {formatTemperature, formatVoltage} from '@/utils/utils';
 import {useDevice} from '@/context/DeviceContext';
 import {deviceKey} from '@/api/devices';
 import QueryError from '@/components/QueryError';
@@ -44,6 +45,8 @@ export default function Dashboard() {
     const deviceDetails = [
         {label: '接入方式', value: device.accessMode === 'mqtt' ? '蜂窝 MQTT' : deviceStatus?.port_name || 'USB 串口'},
         {label: '固件版本', value: device.features?.firmware || unavailable},
+        {label: '模块温度', value: formatTemperature(mobile?.temperature_mc, connected)},
+        {label: 'VBAT 电压', value: formatVoltage(mobile?.battery_mv, connected)},
         {label: 'SIM 卡', value: connected ? mobile?.sim_ready ? '已就绪' : '未就绪' : unavailable},
         {label: '网络注册', value: connected ? mobile?.is_registered ? '已注册' : '未注册' : unavailable},
         {label: '飞行模式', value: connected ? deviceStatus?.flymode ? '已开启' : '已关闭' : unavailable},

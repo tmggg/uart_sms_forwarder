@@ -15,7 +15,7 @@ import * as serialApi from '../api/serial';
 import {Button} from '@/components/ui/button';
 import {Card, CardContent, CardHeader, CardTitle} from '@/components/ui/card';
 import type {DeviceStatus} from '@/api/types';
-import {formatUptime} from '@/utils/utils.ts';
+import {formatUptime, formatTemperature, formatVoltage} from '@/utils/utils.ts';
 import {PageHeader} from '@/components/PageHeader';
 import {cn} from '@/lib/utils';
 
@@ -213,7 +213,10 @@ export default function SerialControl() {
                                     <h3 className="mb-1 text-xs font-bold text-slate-800">模块信息</h3>
                                     <dl className="grid gap-x-8 sm:grid-cols-2">
                                         <InfoRow label="接入方式" value={isMqtt ? "蜂窝 MQTT" : deviceStatus?.port_name || "USB 串口"} mono/>
+                                        {isMqtt && <InfoRow label="加密协议" value={device.features?.crypto_protocol || 'sms-air780-v1'} mono/>}
                                         <InfoRow label="固件版本" value={device.features?.firmware || unavailable} mono/>
+                                        <InfoRow label="模块温度" value={formatTemperature(mobile?.temperature_mc, connected)} mono/>
+                                        <InfoRow label="VBAT 电压" value={formatVoltage(mobile?.battery_mv, connected)} mono/>
                                         <InfoRow
                                             label="设备时间"
                                             value={connected && deviceStatus?.timestamp

@@ -40,6 +40,11 @@ async function main() {
             {id: 'deviceC', name: 'Offline C', accessMode: 'serial', online: false, port: '/dev/ttyUSB1'},
         ].map((d, i) => ({...d, lastSeen: Date.now(), createdAt: Date.now(), features: {locate_led: true, locate_gpio: 21, imei: `12345678901234${i}`, model: 'Air780EPM', firmware: 'V2050', mobile: mobile(`1380000000${i + 1}`)}, status: {locating: false, mobile: mobile(`1380000000${i + 1}`), memory_usage: 96}}));
         records[0].status.mobile.imsi = '460011234567890';
+        records[0].status.mobile.battery_mv = 3850;
+        records[0].status.mobile.temperature_mc = 32500;
+        records[1].features.model = 'Air724UG';
+        records[1].features.call_control = true; // stale firmware metadata must not restore removed UI
+        records[2].status.mobile.battery_mv = 4200;
         records[1].status.mobile.operator = '测试运营商';
         const sms = Object.fromEntries(records.map((d) => [d.id, [{id: `msg-${d.id}`, deviceId: d.id, from: '10086', to: '', content: `只属于 ${d.id} 的短信`, type: 'incoming', status: 'received', createdAt: Date.now(), updatedAt: Date.now()}]]));
         const channels = Object.fromEntries(records.map((d) => [d.id, [{type: 'dingtalk', enabled: true, config: {secretKey: `SAVED_${d.id}`, signSecret: ''}}]]));
@@ -66,7 +71,7 @@ async function main() {
             if (p === '/version') return json({version: 'offline-test'});
             if (p === '/devices' && method === 'GET') return failList ? json({error: '列表暂时不可用'}, 503) : json(records);
             if (p === '/devices/server-public-key') return json({keyId: 'server-key-1', publicKey});
-            if (p === '/devices/enroll') return json({deviceId: body.deviceId, registrationToken: 'OFFLINE_TEST_TOKEN_NOT_REAL_1234567890', keyId: 'server-key-1', publicKey, topicPrefix: 'sms/v1/devices'}, 201);
+            if (p === '/devices/enroll') return json({deviceType: body.deviceType || 'air780', cryptoProtocol: body.deviceType === 'air724ug' ? 'sms-air724-v2' : 'sms-air780-v1', protocolVersion: body.deviceType === 'air724ug' ? 2 : 1, publicKeyFile: body.deviceType === 'air724ug' ? '/lua/server_public.pem' : '/luadb/server_public.pem', rsaBits: 2048, deviceId: body.deviceId, registrationToken: 'OFFLINE_TEST_TOKEN_NOT_REAL_1234567890', keyId: 'server-key-1', publicKey, topicPrefix: 'sms/v1/devices'}, 201);
             if (p.startsWith('/device-enrollments/')) return empty();
             const match = p.match(/^\/devices\/(device[A-C])(?:\/(.*))?$/);
             if (!match) {unexpected.push(p); return json({error: 'unexpected mock route'}, 404);}
@@ -140,6 +145,29 @@ async function main() {
         await page.locator('form button[type="submit"]').click();
         await page.getByRole('heading', {name: '设备管理', exact: true}).waitFor();
         await text('USB A'); await text('MQTT B');
+        const cardFor = (name) => page.locator('article').filter({has: page.getByRole('link', {name, exact:true})});
+        assert.equal(await cardFor('USB A').getByText('3.850 V', {exact:true}).count(), 1);
+        assert.equal(await cardFor('USB A').getByText('32.5 °C', {exact:true}).count(), 1);
+        assert.equal(await cardFor('USB A').getByRole('img', {name:'信号4格，良好 · -88 dBm'}).count(), 1);
+        for (const name of ['MQTT B', 'Offline C']) {
+            const voltage = cardFor(name).locator('dl > div').filter({has: page.getByText('VBAT 电压', {exact:true})});
+            assert.equal(await voltage.locator('dd').innerText(), '—');
+        }
+        console.log('PASS device-card voltage, unsupported device and offline reading');
+        const offlineSignal = cardFor('Offline C').locator('dl > div').filter({has: page.getByText('信号质量', {exact:true})});
+        assert.equal(await offlineSignal.getByRole('img', {name:'信号不可用'}).count(), 1);
+        for (const [rsrp, bars] of [[-75,5],[-85,4],[-95,3],[-105,2],[-120,1],[0,0]]) {
+            records[0].status.mobile.rsrp = rsrp;
+            const response = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/devices' && r.request().method() === 'GET');
+            await page.getByRole('button', {name:'刷新',exact:true}).click();
+            await response;
+            await page.waitForFunction(({bars}) => {
+                const card = [...document.querySelectorAll('article')].find((c) => c.querySelector('a')?.textContent === 'USB A');
+                return card?.querySelectorAll('svg[role="img"] rect[data-active="true"]').length === bars;
+            }, {bars});
+        }
+        records[0].status.mobile.rsrp = -88;
+        console.log('PASS signal icon changes with RSRP, missing readings and offline state');
         const hiddenValue = async (value) => {
             assert.equal(await page.getByText(value, {exact:true}).count(), 0, 'Sensitive value is visible before reveal');
             assert.equal(await page.locator(`[title="${value}"]`).count(), 0, 'Sensitive value leaked through tooltip');
@@ -187,6 +215,8 @@ async function main() {
         failLocate = false;
         await page.getByRole('link', {name: 'MQTT B', exact: true}).click();
         await tab('deviceB', 'serial');
+        assert.equal(await page.getByLabel('Air724UG 电话测试',{exact:true}).count(),0);
+        assert.equal(await page.getByRole('button',{name:'拨打电话',exact:true}).count(),0);
         await page.getByRole('button', {name: '定位 MQTT B', exact: true}).click();
         await page.getByRole('button', {name: '停止定位 MQTT B', exact: true}).waitFor();
         await page.getByRole('button', {name: '停止定位 MQTT B', exact: true}).click();
@@ -204,30 +234,34 @@ async function main() {
 
         await page.getByRole('link', {name: 'USB A', exact: true}).click();
         await page.getByRole('heading', {name: '设备概览', exact: true}).waitFor();
+        await text('3.850 V');
         await page.getByRole('button',{name:'显示 USB A 手机号',exact:true}).waitFor();
         await hiddenValue('13800000001');
         await page.getByRole('button',{name:'显示 USB A 手机号',exact:true}).click();
         await page.getByText('13800000001',{exact:true}).waitFor();
         await tab('deviceA','serial');
+        await text('3.850 V');
         await page.getByRole('button',{name:'显示 USB A 手机号',exact:true}).waitFor();
         await page.getByRole('button',{name:'显示 USB A 手机号',exact:true}).click();
         await page.getByText('13800000001',{exact:true}).waitFor();
         await switchTo('deviceB');
         await page.getByRole('button',{name:'显示 MQTT B 手机号',exact:true}).waitFor();
+        assert.equal(await page.getByText('3.850 V', {exact:true}).count(), 0);
+        assert.equal(await page.locator('dl').filter({has:page.getByText('VBAT 电压', {exact:true})}).getByText('VBAT 电压', {exact:true}).count(), 1);
         await hiddenValue('13800000002');
         await switchTo('deviceA');
         await page.getByRole('button',{name:'显示 USB A 手机号',exact:true}).waitFor();
         await hiddenValue('13800000001');
         console.log('PASS dashboard/control masking and reset after device/page switch');
-        await text('中国联通（SIM 推断）');
+        await text('中国联通');
         await tab('deviceA','serial');
-        await text('中国联通（SIM 推断）');
+        await text('中国联通');
         await switchTo('deviceB');
         await text('测试运营商');
         await tab('deviceB','serial');
         await text('测试运营商');
         await page.goto(`${base}/devices/deviceB`);
-        for (const [imsi, expected] of [['460031234567890','中国电信（SIM 推断）'],['460151234567890','中国广电（SIM 推断）'],['460001234567890','中国移动（SIM 推断）'],['530011234567890','One NZ（新西兰）（SIM 推断）'],['530041234567890','One NZ（新西兰）（SIM 推断）'],['310260123456789','未识别运营商'],['unknown','等待运营商信息']]) {
+        for (const [imsi, expected] of [['460031234567890','中国电信'],['460151234567890','中国广电'],['460001234567890','中国移动'],['530011234567890','One NZ(新西兰)'],['530041234567890','One NZ(新西兰)'],['310260123456789','未识别运营商'],['unknown','等待运营商信息']]) {
             records[0].status.mobile.imsi=imsi;
             await switchTo('deviceA');
             await text(expected);
@@ -306,6 +340,8 @@ async function main() {
         await page.setViewportSize({width: 1440, height: 1000});
         await tab('deviceB', 'auto-flymode'); await text('请使用定时恢复的飞行模式');
         await switchTo('deviceC'); await tab('deviceC', 'serial');
+        await text('VBAT 电压');
+        assert.equal(await page.getByText('4.200 V', {exact:true}).count(), 0);
         assert(await page.getByRole('button', {name: '开启飞行模式', exact: true}).isDisabled());
         console.log('PASS MQTT timed restoration, mobile layout and offline controls');
 
@@ -357,6 +393,24 @@ async function main() {
         await page.getByRole('button', {name: '确认撤销', exact: true}).click();
         await text('设备 MQTT 业务凭据已撤销');
         console.log('PASS enrollment, public key download, secret lifetime and revoke');
+        await page.locator('#enroll-device-type').selectOption('air724ug');
+        await page.locator('#enroll-device-id').fill('new-air724');
+        await page.getByRole('checkbox').check();
+        await page.getByRole('button',{name:'生成注册配置',exact:true}).click();
+        await text('配置已生成：new-air724');
+        await text('sms-air724-v2'); await text('/lua/server_public.pem');
+        assert.equal(requests.filter(r=>r.path==='/devices/enroll').at(-1).body.deviceType,'air724ug');
+        const air724DownloadPromise=page.waitForEvent('download');
+        await page.getByRole('button',{name:'保存注册配置',exact:true}).click();
+        const air724Download=await air724DownloadPromise;
+        const air724Config=JSON.parse(await fs.readFile(await air724Download.path(),'utf8'));
+        assert.equal(air724Config.protocolVersion,2); assert.equal(air724Config.cryptoProtocol,'sms-air724-v2');
+        assert.equal(air724Config.publicKeyFile,'/lua/server_public.pem');
+        await page.locator('#enroll-device-type').selectOption('air780');
+        assert.equal(await page.locator('#registration-token').count(),0,'Type switch retained issued credentials');
+        assert(!(await page.getByRole('checkbox').isChecked()),'Type switch did not require renewed confirmation');
+        console.log('PASS Air724 protocol enrollment, config export and secret reset');
+
 
         await page.locator('a[href="/devices"]').first().click();
         failList = true;

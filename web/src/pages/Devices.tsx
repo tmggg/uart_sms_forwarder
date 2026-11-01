@@ -12,6 +12,20 @@ import QueryError from '@/components/QueryError';
 import SensitiveValue from '@/components/SensitiveValue';
 import LocateButton from '@/components/LocateButton';
 import {cn} from '@/lib/utils';
+import {formatTemperature, formatVoltage, formatSignalQuality} from '@/utils/utils';
+
+function SignalBars({rsrp, connected}: {rsrp?: number; connected: boolean}) {
+    const description = formatSignalQuality(rsrp, connected);
+    const level = description === '—' || rsrp == null ? 0
+        : rsrp >= -80 ? 5 : rsrp >= -90 ? 4 : rsrp >= -100 ? 3 : rsrp >= -110 ? 2 : 1;
+    return <svg role="img" aria-label={level ? `信号${level}格，${description}` : '信号不可用'}
+        viewBox="0 0 28 20" className={cn('inline-block h-5 w-7', level >= 4 ? 'text-emerald-600' : level >= 3 ? 'text-amber-500' : level ? 'text-red-500' : 'text-slate-300')}>
+        <title>{level ? description : '离线或暂无信号数据'}</title>
+        {[4, 7, 10, 14, 18].map((height, index) => <rect key={height} data-active={index < level}
+            x={index * 5.5} y={20 - height} width="4" height={height} rx="1"
+            fill={index < level ? 'currentColor' : '#cbd5e1'}/>)}
+    </svg>;
+}
 
 export default function Devices() {
     const queryClient = useQueryClient();
@@ -60,7 +74,7 @@ export default function Devices() {
                         <button type="button" aria-label={`重命名 ${displayName}`} onClick={() => {setEditing(d); setName(d.name || d.id);}} className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-blue-700"><Pencil className="size-4"/></button>
                     </div>
                     <dl className="space-y-3 px-5 pb-5 text-xs">
-                        {[['接入方式', d.accessMode === 'mqtt' ? '蜂窝 MQTT' : 'USB 串口'], ['手机号', mobile?.number || '未读取到'], ['模组', d.features?.model || '—'], ['最后通信', d.lastSeen ? new Date(d.lastSeen).toLocaleString('zh-CN') : '—']].map(([label, value]) => <div key={label} className="flex min-w-0 justify-between gap-3"><dt className="shrink-0 text-slate-400">{label}</dt><dd className="truncate text-right font-medium text-slate-700" title={label === '手机号' ? undefined : value}>{label === '手机号' ? <SensitiveValue value={mobile?.number} label={`${displayName} 手机号`}/> : value}</dd></div>)}
+                        {[['接入方式', d.accessMode === 'mqtt' ? '蜂窝 MQTT' : 'USB 串口'], ['手机号', mobile?.number || '未读取到'], ['模组', d.features?.model || '—'], ['模块温度', formatTemperature(d.status?.mobile?.temperature_mc, d.online && !query.isError)], ['VBAT 电压', formatVoltage(d.status?.mobile?.battery_mv, d.online && !query.isError)], ['信号质量', formatSignalQuality(d.status?.mobile?.rsrp, d.online && !query.isError)], ['最后通信', d.lastSeen ? new Date(d.lastSeen).toLocaleString('zh-CN') : '—']].map(([label, value]) => <div key={label} className="flex min-w-0 justify-between gap-3"><dt className="shrink-0 text-slate-400">{label}</dt><dd className="truncate text-right font-medium text-slate-700" title={label === '手机号' ? undefined : value}>{label === '手机号' ? <SensitiveValue value={mobile?.number} label={`${displayName} 手机号`}/> : label === '信号质量' ? <SignalBars rsrp={d.status?.mobile?.rsrp} connected={d.online && !query.isError}/> : value}</dd></div>)}
                     </dl>
                     <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-5 py-3"><span className={cn('flex items-center gap-1.5 text-xs font-semibold', query.isError ? 'text-slate-400' : d.online ? 'text-emerald-600' : 'text-slate-500')}><span className={cn('size-1.5 rounded-full', !query.isError && d.online ? 'bg-emerald-500' : 'bg-slate-300')}/>{query.isError ? '状态未更新' : d.online ? '在线' : '离线'}</span><div className="flex items-center gap-3"><LocateButton deviceId={d.id} name={displayName} online={d.online && !query.isError} supported={d.features?.locate_led === true} locating={d.status?.locating}/><Link to={`/devices/${encodeURIComponent(d.id)}`} className="flex items-center gap-1 text-xs font-semibold text-blue-700">{d.online ? '进入设备' : '查看设备'}<ArrowRight className="size-3.5"/></Link></div></div>
                 </article>;

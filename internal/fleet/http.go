@@ -49,16 +49,23 @@ func (m *Manager) Register(api *echo.Group) {
 		if err != nil {
 			return apiError(c, err)
 		}
-		return c.JSON(http.StatusOK, map[string]any{"keyId": m.Config.MQTT.KeyID, "publicKey": string(key)})
+		return c.JSON(http.StatusOK, map[string]any{"keyId": m.Config.MQTT.KeyID, "publicKey": string(key), "supportedProtocols": []string{protocolGCM, protocolCBC}, "rsaBits": m.private.N.BitLen()})
 	})
 	api.POST("/devices/enroll", func(c *echo.Context) error {
 		var req struct {
-			DeviceID string `json:"deviceId"`
+			DeviceID   string `json:"deviceId"`
+			DeviceType string `json:"deviceType"`
 		}
 		if err := c.Bind(&req); err != nil {
 			return apiError(c, err)
 		}
-		token, err := m.Provision(c.Request().Context(), req.DeviceID)
+		protocol, deviceType, publicPath := protocolGCM, "air780", "/luadb/server_public.pem"
+		if req.DeviceType == "air724ug" {
+			protocol, deviceType, publicPath = protocolCBC, "air724ug", "/lua/server_public.pem"
+		} else if req.DeviceType != "" && req.DeviceType != "air780" {
+			return apiError(c, errors.New("unsupported device type"))
+		}
+		token, err := m.ProvisionProtocol(c.Request().Context(), req.DeviceID, protocol)
 		if err != nil {
 			return apiError(c, err)
 		}
@@ -67,7 +74,7 @@ func (m *Manager) Register(api *echo.Group) {
 			return apiError(c, err)
 		}
 		c.Response().Header().Set("Cache-Control", "no-store")
-		return c.JSON(http.StatusCreated, map[string]any{"deviceId": req.DeviceID, "registrationToken": token, "keyId": m.Config.MQTT.KeyID, "publicKey": string(key), "topicPrefix": m.Config.MQTT.TopicPrefix})
+		return c.JSON(http.StatusCreated, map[string]any{"deviceType": deviceType, "cryptoProtocol": protocol, "protocolVersion": map[string]int{protocolGCM: 1, protocolCBC: 2}[protocol], "rsaBits": m.private.N.BitLen(), "publicKeyFile": publicPath, "deviceId": req.DeviceID, "registrationToken": token, "keyId": m.Config.MQTT.KeyID, "publicKey": string(key), "topicPrefix": m.Config.MQTT.TopicPrefix})
 	})
 	api.POST("/device-enrollments/:deviceID/revoke", func(c *echo.Context) error {
 		if !validID.MatchString(c.Param("deviceID")) {

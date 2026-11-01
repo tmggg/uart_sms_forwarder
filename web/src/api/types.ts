@@ -51,6 +51,8 @@ export interface MobileInfo {
     csq: number;
     rsrp: number;
     rsrq: number;
+    temperature_mc?: number | null; // Module temperature in millidegrees Celsius
+    battery_mv?: number | null; // VBAT millivolts; absent on unsupported devices
     number: string;
     uptime: number;              // 开机时长 (秒)
     sms_ready?: boolean;

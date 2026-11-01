@@ -1,0 +1,38 @@
+[
+  {
+    "root": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "packet": {
+      "v": 2,
+      "device_id": "test_device",
+      "sid": "000102030405060708090a0b0c0d0e0f",
+      "direction": "up",
+      "seq": 5,
+      "kind": "event",
+      "iv": "101112131415161718191a1b1c1d1e1f",
+      "ciphertext": "6c67a11008328f9bd9259ef60f4d6b8779d3462393f147af10885bcebc12a2ed31485372c1528852fc3342dac4dbe67d4a3053f1030836edb1c0e0afbfbd864bc1a637d66d6514dcfe17c908bc22debffe048881b250306cfc283382bfdb30bf8d92eedea64d4ecc0378df7f03a715e26a43f74687da929adeaa5db673e6d86273bea83b1a4a80f4fa29bc2890f6f1abf5782cacd6a3a377749ace42647d47c3a4b96b7dd20259d8774268fb64985348",
+      "tag": "722ff6a076e19b049bd5ceecf5b3ac75d122935ad0ee019381fc34bfe5241fb2"
+    },
+    "body": {
+      "message": "中文 cbc test",
+      "number": 123
+    }
+  },
+  {
+    "root": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "packet": {
+      "v": 2,
+      "device_id": "test_device",
+      "sid": "000102030405060708090a0b0c0d0e0f",
+      "direction": "down",
+      "seq": 5,
+      "kind": "command",
+      "iv": "101112131415161718191a1b1c1d1e1f",
+      "ciphertext": "7c6601f3c6d236851fefde5ce787266d88bed62e239a78a8d6e6f07e05d21df7607a9f9dbd6e90ae2d3547cc04cf9f471006bcac6a76870645ece73024d04eef25ae9bd3d09f667f2ba0955a05997a1fcbd835cb80bb19fd94a07812b565aa72284fb4d02c1a4acdbf94b59a01493dee20652ea9dedcea830abf4dec58aa0c962544dc7754181d9ec92c53a1647798c2241e7ef9414d7c984a0b0c8369c71b9600954ad3c0bd1574c63240bd416c511e",
+      "tag": "00ee5e1be7b954d2ee5747fb0a3914571f76f241374dbf368dff4f3a46f892b2"
+    },
+    "body": {
+      "message": "中文 cbc test",
+      "number": 123
+    }
+  }
+]
