@@ -11,9 +11,12 @@
 | 设备概览 | /devices/{id} | 所选设备的链路、SIM、信号、号码、短信统计 |
 | 短信中心 | /devices/{id}/messages | 所选设备的历史、发送、回复和删除 |
 | 设备控制 | /devices/{id}/serial | 飞行模式、重启、重置协议栈及最近命令结果 |
+| 来电播报 | /devices/{id}/tts | 来电自动应答的TTS文案；保存后经MQTT下发并写入设备闪存 |
 | 通知渠道 | /devices/{id}/notifications | 所选设备的独立转发设置与测试 |
 | 计划任务 | /devices/{id}/scheduled-tasks | 所选设备任务的创建、修改、执行及删除 |
 | 自动飞行 | /devices/{id}/auto-flymode | USB设备的空闲策略；MQTT设备引导使用定时恢复 |
+
+「来电播报」页保存 `tts_text` 属性（`PUT /api/devices/{id}/properties/tts_text`，值为 `{"text":"..."}`）。设备在线时后端立即下发 `set_tts` 命令并返回 `pushed:true`；离线时只保存并返回 `pushed:false`，设备下次注册成功后自动补发。留空保存表示恢复设备固件内的默认文案。上限 2000 字节（UTF-8），由前端计数并提示。
 
 Bark 渠道可选择官方服务器（`https://api.day.app`）或自定义服务器，并填写该服务器在 Bark App 中对应的 Key。自定义地址填写基础地址（支持路径前缀），不包含 `/push` 或 Key。保存并启用后可发送测试通知；实际转发使用现有消息文本，保留短信正文、设备别名、来源号码和时间。接入方式遵循 [Bark 使用文档](https://bark.day.app/#/tutorial)，通过 POST JSON 向 `/push` 提交 `device_key` 和 `body`。
 

@@ -18,6 +18,8 @@ const (
 	PropertyIDNotificationChannels = "notification_channels"
 	// PropertyIDAutoFlymodeConfig 自动飞行模式配置的固定 ID
 	PropertyIDAutoFlymodeConfig = "auto_flymode_config"
+	// PropertyIDTTSText 来电自动接听播报文案（仅 Air724UG 支持），空字符串表示使用固件默认值
+	PropertyIDTTSText = "tts_text"
 
 	DefaultAutoFlymodeIdleTimeoutHours int64 = 1
 	MinAutoFlymodeIdleTimeoutHours     int64 = 1

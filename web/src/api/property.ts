@@ -76,6 +76,31 @@ export interface Version {
     version: string;
 }
 
+// ==================== 来电播报文案（Air724UG） ====================
+
+const PROPERTY_ID_TTS_TEXT = 'tts_text';
+
+export interface TTSSaveResult {
+    saved: boolean;
+    pushed: boolean;
+    message?: string;
+    commandId?: string;
+}
+
+// 空字符串表示设备使用固件内置的默认文案
+export const getTTSText = async (deviceId: string, signal?: AbortSignal): Promise<string> => {
+    const value = await getProperty<{ text?: string }>(deviceId, PROPERTY_ID_TTS_TEXT, signal);
+    return value?.text ?? '';
+};
+
+// 保存后由后端通过 MQTT 下发 set_tts 命令；设备离线时仅保存，下次上线自动补发
+export const saveTTSText = async (deviceId: string, text: string): Promise<TTSSaveResult> => {
+    return apiClient.put<TTSSaveResult>(devicePath(deviceId, `/properties/${encodeURIComponent(PROPERTY_ID_TTS_TEXT)}`), {
+        name: '来电播报文案',
+        value: {text},
+    });
+};
+
 export const getVersion = () => {
     return apiClient.get<Version>('/version');
 }

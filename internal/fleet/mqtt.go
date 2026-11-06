@@ -15,7 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dushixiang/uart_sms_forwarder/internal/service"
 	paho "github.com/eclipse/paho.mqtt.golang"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -307,7 +309,39 @@ func (m *Manager) registerMQTT(p Envelope) error {
 	if err := m.attach(p.DeviceID, "mqtt", &mqttPeer{m, p.DeviceID}); err != nil {
 		return err
 	}
-	return m.sendDownLocked(p.DeviceID, "register_result", map[string]any{"accepted": true, "server_time": m.now().Unix()})
+	if err := m.sendDownLocked(p.DeviceID, "register_result", map[string]any{"accepted": true, "server_time": m.now().Unix()}); err != nil {
+		return err
+	}
+	// Replay the saved announcement text; a device without a stored value keeps its firmware default.
+	if err := m.pushStoredTTSLocked(p.DeviceID); err != nil {
+		m.log.Warn("TTS text push failed: " + err.Error())
+	}
+	return nil
+}
+
+// pushStoredTTSLocked replays the saved TTS text to a freshly registered device.
+// The caller must hold mqttMu.
+func (m *Manager) pushStoredTTSLocked(id string) error {
+	var s Setting
+	if err := m.DB.First(&s, "device_id = ? AND id = ?", id, service.PropertyIDTTSText).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	var value struct {
+		Text string `json:"text"`
+	}
+	if json.Unmarshal([]byte(s.Value), &value) != nil {
+		return nil
+	}
+	return m.sendDownLocked(id, "command", map[string]any{
+		"device_id":  id,
+		"request_id": uuid.NewString(),
+		"action":     "set_tts",
+		"text":       value.Text,
+		"expires_at": m.now().Add(120 * time.Second).Unix(),
+	})
 }
 
 func (m *Manager) sendMQTT(ctx context.Context, id, kind string, body any) error {

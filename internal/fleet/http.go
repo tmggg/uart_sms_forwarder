@@ -188,7 +188,21 @@ func (m *Manager) Register(api *echo.Group) {
 		if err := m.SetSetting(c.Request().Context(), c.Param("deviceID"), c.Param("id"), req.Name, req.Value); err != nil {
 			return apiError(c, err)
 		}
-		return c.NoContent(http.StatusNoContent)
+		if c.Param("id") != service.PropertyIDTTSText {
+			return c.NoContent(http.StatusNoContent)
+		}
+		var value struct {
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal(req.Value, &value); err != nil {
+			return apiError(c, err)
+		}
+		cmd, err := m.Command(c.Request().Context(), c.Param("deviceID"), "set_tts", map[string]any{"text": value.Text}, "")
+		if err != nil {
+			// Saved for the next connection: an offline device cannot be reached now.
+			return c.JSON(http.StatusOK, map[string]any{"saved": true, "pushed": false, "message": err.Error()})
+		}
+		return c.JSON(http.StatusOK, map[string]any{"saved": true, "pushed": true, "commandId": cmd.ID})
 	})
 	d.POST("/notifications/:type/test", func(c *echo.Context) error {
 		if err := m.TestNotification(c.Request().Context(), c.Param("deviceID"), c.Param("type")); err != nil {

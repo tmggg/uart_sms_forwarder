@@ -10,6 +10,7 @@ import DeviceEnrollment from './pages/DeviceEnrollment';
 import Dashboard from './pages/Dashboard';
 import Messages from './pages/Messages';
 import SerialControl from './pages/SerialControl';
+import TTSSettings from './pages/TTSSettings';
 import NotificationChannels from './pages/NotificationChannels';
 import ScheduledTasksConfig from './pages/ScheduledTasksConfig';
 import AutoFlymodeSettings from './pages/AutoFlymodeSettings';
@@ -27,6 +28,7 @@ export default function App() {
             <Route index element={<Dashboard/>}/>
             <Route path="messages" element={<Messages/>}/>
             <Route path="serial" element={<SerialControl/>}/>
+            <Route path="tts" element={<TTSSettings/>}/>
             <Route path="notifications" element={<NotificationChannels/>}/>
             <Route path="scheduled-tasks" element={<ScheduledTasksConfig/>}/>
             <Route path="auto-flymode" element={<AutoFlymodeSettings/>}/>

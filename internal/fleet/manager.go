@@ -189,8 +189,16 @@ func (m *Manager) Device(ctx context.Context, id string) (Device, error) {
 }
 
 func (m *Manager) SetSetting(ctx context.Context, id, key, name string, value json.RawMessage) error {
-	if key != service.PropertyIDNotificationChannels && key != service.PropertyIDAutoFlymodeConfig {
+	if key != service.PropertyIDNotificationChannels && key != service.PropertyIDAutoFlymodeConfig && key != service.PropertyIDTTSText {
 		return errors.New("unsupported property")
+	}
+	if key == service.PropertyIDTTSText {
+		var cfg struct {
+			Text string `json:"text"`
+		}
+		if json.Unmarshal(value, &cfg) != nil || len(cfg.Text) > 2000 {
+			return errors.New("invalid TTS text")
+		}
 	}
 	if key == service.PropertyIDAutoFlymodeConfig {
 		var cfg models.AutoFlymodeConfig
@@ -240,6 +248,8 @@ func (m *Manager) GetSetting(ctx context.Context, id, key string) (Setting, erro
 		case service.PropertyIDAutoFlymodeConfig:
 			b, _ := json.Marshal(service.DefaultAutoFlymodeConfig())
 			s.Value = string(b)
+		case service.PropertyIDTTSText:
+			s.Value = `{"text":""}`
 		default:
 			return s, err
 		}
@@ -356,6 +366,11 @@ func (m *Manager) Command(ctx context.Context, id, action string, args map[strin
 			if !ok || duration < 1 || duration > 86400 || duration != float64(int64(duration)) {
 				return Command{}, errors.New("MQTT flymode requires duration_seconds 1..86400")
 			}
+		}
+	case "set_tts":
+		text, ok := args["text"].(string)
+		if !ok || len(text) > 2000 {
+			return Command{}, errors.New("text must be a string of at most 2000 bytes")
 		}
 	case "get_status", "reset_stack", "reboot_mcu":
 	default:

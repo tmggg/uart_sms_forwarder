@@ -13,6 +13,7 @@ import {
     Plane,
     RadioTower,
     Smartphone,
+    Volume2,
     X,
 } from 'lucide-react';
 import {useQuery} from '@tanstack/react-query';
@@ -29,6 +30,7 @@ const deviceNavigation = [
     {name: '概览', description: '运行状态与数据', href: '/', icon: LayoutDashboard},
     {name: '短信中心', description: '短信收发与历史', href: '/messages', icon: MessageSquareText},
     {name: '设备控制', description: '设备与短信下发', href: '/serial', icon: Smartphone},
+    {name: '来电播报', description: 'TTS 语音文案', href: '/tts', icon: Volume2},
     {name: '通知渠道', description: '管理消息推送', href: '/notifications', icon: Bell},
     {name: '计划任务', description: '自动执行任务', href: '/scheduled-tasks', icon: Clock3},
     {name: '自动飞行', description: '飞行模式策略', href: '/auto-flymode', icon: Plane},
