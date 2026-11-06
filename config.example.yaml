@@ -19,7 +19,7 @@ App:
     Secret: ""
     ExpiresHours: 168 # 7天
   Users:
-    # 使用 bcrypt 哈希；示例密码为 admin123，部署前用 htpasswd -nB -C 12 admin 生成并替换
+    # 使用 Bcrypt 加密，默认密码为 admin123，建议首次登录后修改密码，搜索 bcrypt在线加密网站 即可
     admin: "$2y$12$7DXcOiX1D59xNTIn5riUKusAPLP88LxxoczWmUT83MBj5EFznbp8a"
   OIDC:
     Enabled: false

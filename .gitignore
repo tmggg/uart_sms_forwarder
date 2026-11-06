@@ -18,5 +18,6 @@ web/test-results/
 __pycache__/
 .DS_Store
 
-# Per-device deployment copies contain credentials.
+# Air780 device scripts: keep per-device credentials out of the repo.
+air780/device_config.lua
 air780-*/

@@ -6,13 +6,14 @@ services:
     container_name: uart_sms_forwarder
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "9090:8080"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./config.yaml:/app/config.yaml:ro
     # Map each actual host port. Backend scans only ports visible inside container.
-    # devices:
+    devices:
+      - /dev/serial/by-id/usb-AirM2M_AirM2M_Compo_000000000001-if06:/dev/ttyACM2
     #   - /dev/serial/by-id/REPLACE_DEVICE_A:/dev/ttyUSB0
     #   - /dev/serial/by-id/REPLACE_DEVICE_B:/dev/ttyUSB1
     environment:
@@ -27,12 +28,12 @@ services:
     restart: unless-stopped
     environment:
       EMQX_NODE__NAME: emqx@sms_mqtt
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
       EMQX_NODE__DATA_DIR: /opt/emqx/data
       EMQX_NODE__COOKIE: ${EMQX_NODE_COOKIE:?Set EMQX_NODE_COOKIE in .env}
-      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
     ports:
-      - "1883:1883"
-      - "127.0.0.1:18083:18083"
+      - "10086:1883"
+      - "18084:18083"
     volumes:
       - sms_mqtt_data:/opt/emqx/data
       - sms_mqtt_log:/opt/emqx/log
